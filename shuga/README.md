@@ -9,35 +9,45 @@ Gentle diabetes tracking for South Africans who manage their diabetes with medic
 - **Share on WhatsApp:** one tap builds a ready-to-send message for **Family** (warm and short), your **Doctor** (day-by-day numbers, ranges and meds) or your **Dietitian** (meals, hunger and fullness, high after-meal readings)
 - Works as an installable home-screen app (PWA) and supports dark mode. All times are shown in SAST.
 
+## Go live (Vercel + Neon + your domain)
+
+1. **Database:** create a free Postgres project at [neon.tech](https://neon.tech) (choose a region near South Africa, e.g. Frankfurt) and copy the connection string.
+2. **Hosting:** at [vercel.com](https://vercel.com), sign in with GitHub, choose **Add New → Project**, and import this repo. Set **Root Directory** to `shuga`.
+3. **Environment variables** (Vercel → Project → Settings → Environment Variables):
+   `DATABASE_URL`, `AUTH_SECRET` (`openssl rand -base64 32`), `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_FACEBOOK_ID`, `AUTH_FACEBOOK_SECRET`.
+   Then deploy. The build creates the database tables automatically.
+4. **Domain:** in Vercel → Settings → Domains, add `yourdomain.co.za` and follow the DNS records it shows (usually an `A` record to `76.76.21.21` and a `CNAME` for `www` to `cname.vercel-dns.com`), added at your domain registrar.
+5. **OAuth redirect URIs:** add your domain to both providers:
+   - Google: `https://yourdomain.co.za/api/auth/callback/google` (also add `https://yourdomain.co.za` as an authorised JavaScript origin)
+   - Facebook: `https://yourdomain.co.za/api/auth/callback/facebook` (also add the domain under App Domains)
+
+### OAuth keys
+
+| Provider | Where |
+|---|---|
+| Google | console.cloud.google.com → APIs & Services → OAuth consent screen (External), then Credentials → Create OAuth client (Web application) |
+| Facebook | developers.facebook.com → My Apps → Create app → "Authenticate and request data from users with Facebook Login" |
+
+While each app is in testing/development mode, only you and the testers you add can sign in. Publish the apps when you're ready for the public. Facebook requires a privacy policy URL before it will let you go live.
+
 ## Run locally
 
 ```bash
 cd shuga
 npm install
-cp .env.example .env        # then fill in the keys below
-npx prisma db push          # creates the SQLite dev database
+cp .env.example .env        # fill in DATABASE_URL (a Neon dev branch works) and the keys
+npx prisma db push
 npm run dev                 # http://localhost:3000
 ```
 
-### OAuth keys
+For local OAuth, also add `http://localhost:3000/api/auth/callback/google` and `/facebook` as redirect URIs.
 
-| Provider | Where | Redirect URI |
-|---|---|---|
-| Google | console.cloud.google.com → APIs & Services → Credentials → OAuth client (Web) | `http://localhost:3000/api/auth/callback/google` |
-| Facebook | developers.facebook.com → Create app → Facebook Login | `http://localhost:3000/api/auth/callback/facebook` |
-
-Put the IDs and secrets in `.env` as `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` and `AUTH_FACEBOOK_ID` / `AUTH_FACEBOOK_SECRET`. Generate `AUTH_SECRET` with `npx auth secret`. When you deploy, add your production domain's callback URLs as well.
-
-### Preview without OAuth
+### Preview without OAuth (local only)
 
 ```bash
 AUTH_DEMO_LOGIN=true npm run dev   # adds a "Preview with demo account" button (never in production)
-npm run seed:demo                  # fills the demo account with two weeks of entries (after its first sign-in)
+npm run seed:demo                  # fills the demo account with two weeks of entries
 ```
-
-## Deploying
-
-SQLite is for development only. For production, set `provider = "postgresql"` in `prisma/schema.prisma`, point `DATABASE_URL` at a Postgres database (Neon, Supabase, RDS…), run `npx prisma db push`, and deploy on Vercel or any Node host. Because the app handles health data, host the database in a region and under terms that suit POPIA.
 
 ## Stack
 
