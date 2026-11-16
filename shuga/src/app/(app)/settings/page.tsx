@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser, displayName } from "@/lib/session";
 import { deleteAllData, signOutAction } from "@/app/actions";
 import { ProfileForm } from "@/components/forms/ProfileForm";
@@ -45,7 +46,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </form>
         </details>
       </section>
-      <p className="muted small" style={{ textAlign: "center", marginTop: 30 }}>Shuga supports your care; it doesn&rsquo;t replace it.<br />If you feel very unwell, contact your clinic or call 10177.</p>
+      <p className="muted small" style={{ textAlign: "center", marginTop: 30 }}>Shuga supports your care; it doesn&rsquo;t replace it.<br />If you feel very unwell, contact your clinic or call 10177.<br /><Link href="/privacy" className="legal-link">Privacy</Link></p>
     </>
   );
 }

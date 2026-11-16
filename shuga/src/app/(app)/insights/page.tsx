@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { afterMealSpikes, loadPeriod, parsePeriod, summarise } from "@/lib/insights";
 import { DAY_MS, dayKey, fmtDayShort } from "@/lib/time";
-import { FULLNESS, HUNGER, MEAL_KINDS, MOODS, fmtMmol, label, labelOf, rangeStatus } from "@/lib/vocab";
+import { ENERGY, FULLNESS, HUNGER, MEAL_KINDS, MOODS, fmtMmol, label, labelOf, rangeStatus } from "@/lib/vocab";
 import { GlucoseChart } from "@/components/GlucoseChart";
 import { PeriodSwitch } from "@/components/PeriodSwitch";
 
@@ -29,19 +29,21 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
     return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null;
   });
 
+  const isToday = days === 1;
+  const todayCheckIn = data.checkIns.at(-1);
   const spikes = afterMealSpikes(data.readings, data.meals, hi).slice(0, 3);
 
   return (
     <>
       <div className="topbar"><span className="wordmark">Shu<i>ga</i></span></div>
       <h1 style={{ marginTop: 18 }}>Insights</h1>
-      <p className="lede">A calm look at the bigger picture.</p>
+      <p className="lede">{isToday ? "A calm look back over today." : "A calm look at the bigger picture."}</p>
       <div style={{ marginTop: 22 }}><PeriodSwitch path="/insights" days={days} /></div>
 
       {!s.readingCount && !s.mealCount && !s.checkInCount ? (
         <div className="card empty" style={{ marginTop: 24 }}>
-          <p className="h2" style={{ color: "var(--ink)" }}>Nothing to show just yet</p>
-          <p>A few days of readings and Shuga will start drawing the picture for you.</p>
+          <p className="h2" style={{ color: "var(--ink)" }}>{isToday ? "Nothing logged today yet" : "Nothing to show just yet"}</p>
+          <p>{isToday ? "Log a reading, a meal or a check-in and today\u2019s picture will appear here." : "A few days of readings and Shuga will start drawing the picture for you."}</p>
           <Link className="btn" href="/log/sugar" style={{ marginTop: 10 }}>Log a reading</Link>
         </div>
       ) : (
@@ -62,7 +64,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
 
           {ctxRows.some(([, v]) => v != null) && (
             <section className="section">
-              <h2 className="section-title">By time of day</h2>
+              <h2 className="section-title">{isToday ? "By moment" : "By time of day"}</h2>
               <div className="card bars">
                 {ctxRows.map(([name, v]) => (
                   <div className="bar-row" key={name}>
@@ -80,7 +82,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             <div className="card">
               {s.mealCount ? (
                 <>
-                  <p style={{ margin: 0 }}><span className="num" style={{ fontSize: 30 }}>{s.mealCount}</span> <span className="muted">meals logged</span></p>
+                  <p style={{ margin: 0 }}><span className="num" style={{ fontSize: 30 }}>{s.mealCount}</span> <span className="muted">{s.mealCount === 1 ? "meal" : "meals"} logged</span></p>
                   {s.hungerAvg != null && <p className="small" style={{ margin: "10px 0 0" }}>Usually <b>{label(HUNGER, Math.round(s.hungerAvg))?.toLowerCase()}</b> before eating{ s.fullAvg != null && <>, and <b>{label(FULLNESS, Math.round(s.fullAvg))?.toLowerCase()}</b> after</>}.</p>}
                   {s.topTags.length > 0 && <p className="small muted" style={{ margin: "8px 0 0" }}>Most often: {s.topTags.map(([t]) => t).join(", ")}</p>}
                   {spikes.length > 0 && (
@@ -98,14 +100,26 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                     </>
                   )}
                 </>
-              ) : <p className="muted" style={{ margin: 0 }}>No meals logged in this period.</p>}
+              ) : <p className="muted" style={{ margin: 0 }}>{isToday ? "No meals logged today." : "No meals logged in this period."}</p>}
             </div>
           </section>
 
           <section className="section">
-            <h2 className="section-title">Mood & habits</h2>
+            <h2 className="section-title">{isToday ? "How you felt" : "Mood & habits"}</h2>
             <div className="card">
-              {s.moodAvg != null ? (
+              {isToday ? (
+                todayCheckIn ? (
+                  <>
+                    <p style={{ margin: 0 }}>Feeling <b>{label(MOODS, todayCheckIn.mood)?.toLowerCase()}</b>{todayCheckIn.energy ? <>, energy <b>{label(ENERGY, todayCheckIn.energy)?.toLowerCase()}</b></> : null}</p>
+                    <p className="small muted" style={{ margin: "8px 0 0" }}>
+                      {[user.takesMeds ? (todayCheckIn.medsTaken === true ? "Meds taken" : todayCheckIn.medsTaken === false ? "Meds not yet" : null) : null, todayCheckIn.moved ? "Moved today" : todayCheckIn.moved === false ? "Not moved yet" : null].filter(Boolean).join(" · ") || "No meds or movement answer yet"}
+                    </p>
+                    {todayCheckIn.note && <p className="small" style={{ margin: "8px 0 0" }}>&ldquo;{todayCheckIn.note}&rdquo;</p>}
+                  </>
+                ) : (
+                  <p className="muted" style={{ margin: 0 }}>No check-in yet today. <Link href="/log/feel" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>Check in →</Link></p>
+                )
+              ) : s.moodAvg != null ? (
                 <>
                   <p style={{ margin: "0 0 14px" }}>Mostly feeling <b>{label(MOODS, Math.round(s.moodAvg))?.toLowerCase()}</b></p>
                   <div className="mood-strip" aria-hidden>
@@ -113,14 +127,14 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                   </div>
                 </>
               ) : <p className="muted" style={{ margin: 0 }}>No check-ins yet in this period.</p>}
-              <div className="stats" style={{ marginTop: 18 }}>
+              {!isToday && <div className="stats" style={{ marginTop: 18 }}>
                 {user.takesMeds && <div><span className="k muted small">Meds taken</span><span className="num" style={{ display: "block", fontSize: 28 }}>{s.medsTakenDays}<small className="muted small"> / {s.medsAnswered || "—"} days</small></span></div>}
                 <div><span className="k muted small">Moved</span><span className="num" style={{ display: "block", fontSize: 28 }}>{s.movedDays}<small className="muted small"> days</small></span></div>
-              </div>
+              </div>}
             </div>
           </section>
 
-          <Link href={`/share?days=${days}`} className="btn ghost block" style={{ marginTop: 28 }}>Share this summary</Link>
+          <Link href={`/share?days=${days}${isToday ? "&to=family" : ""}`} className="btn ghost block" style={{ marginTop: 28 }}>{isToday ? "Share today on WhatsApp" : "Share this summary"}</Link>
         </>
       )}
       <p className="muted small" style={{ textAlign: "center", marginTop: 24 }}>Patterns, not diagnoses. Bring questions to your clinic.</p>

@@ -1,14 +1,16 @@
 import type { CheckIn, GlucoseReading, Meal, User } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { DAY_MS, dayKey, daysAgoSA, fmtDate, fmtDayShort, fmtTime, hourSA, startOfDaySA } from "@/lib/time";
+import { DAY_MS, dayKey, daysAgoSA, fmtDate, fmtDayLong, fmtDayShort, fmtTime, hourSA, startOfDaySA } from "@/lib/time";
 import {
-  ENERGY, FULLNESS, HUNGER, MOODS, PORTIONS, STARCH,
+  ENERGY, FULLNESS, HUNGER, MEAL_KINDS, MOODS, PORTIONS, STARCH,
   contextLabel, fmtMmol, label, labelOf, rangeStatus,
 } from "@/lib/vocab";
 
-export type Period = 7 | 14 | 30;
-export const PERIODS: Period[] = [7, 14, 30];
-export const parsePeriod = (v: unknown): Period => (v === "14" ? 14 : v === "30" ? 30 : 7);
+/** 1 = today only (since midnight SAST). */
+export type Period = 1 | 7 | 14 | 30;
+export const PERIODS: Period[] = [1, 7, 14, 30];
+export const parsePeriod = (v: unknown): Period => (v === "1" ? 1 : v === "14" ? 14 : v === "30" ? 30 : 7);
+export const periodLabel = (days: number) => (days === 1 ? "Today" : `${days} days`);
 
 export async function loadPeriod(userId: string, days: number) {
   const since = daysAgoSA(days - 1);
@@ -166,6 +168,11 @@ export function todaysNudges(args: {
     out.push({ tone: "calm", title: "Anything to eat today?", body: "Just a tap or two — no counting needed.", href: "/log/meal", cta: "Log a meal" });
   }
 
+  const loggedToday = today.readings.length + today.meals.length + today.checkIns.length;
+  if (h >= 18 && loggedToday >= 2) {
+    out.push({ tone: "cheer", title: "Share today with family", body: "Send a short summary of your day on WhatsApp.", href: "/share?days=1&to=family", cta: "Share today" });
+  }
+
   if (streak >= 3) {
     out.push({ tone: "cheer", title: `${streak} days in a row`, body: "Steady and consistent. That's exactly how this works." });
   }
@@ -179,7 +186,7 @@ export function todaysNudges(args: {
 
 export type Audience = "family" | "doctor" | "dietitian";
 export const AUDIENCES: { id: Audience; label: string; blurb: string }[] = [
-  { id: "family", label: "Family", blurb: "Warm and short — how the week went." },
+  { id: "family", label: "Family", blurb: "Warm and short — how things went." },
   { id: "doctor", label: "Doctor", blurb: "Numbers by day, ranges and meds." },
   { id: "dietitian", label: "Dietitian", blurb: "Meals, hunger and after-meal readings." },
 ];
@@ -191,9 +198,11 @@ export function whatsappText(
   audience: Audience,
   name: string,
   s: Summary,
-  data: { readings: GlucoseReading[]; meals: Meal[] },
+  data: { readings: GlucoseReading[]; meals: Meal[]; checkIns?: CheckIn[] },
 ): string {
-  const range = `${fmtDate(s.since)} – ${fmtDate(new Date())}`;
+  if (s.days === 1 && audience === "family") return familyDayText(name, s, data);
+  const range = s.days === 1 ? fmtDayLong(s.since) : `${fmtDate(s.since)} – ${fmtDate(new Date())}`;
+  const span = s.days === 1 ? "today" : `${s.days} days`;
   const target = `${fmtMmol(s.target.lo)}–${fmtMmol(s.target.hi)} mmol/L`;
   const L: string[] = [];
 
@@ -213,7 +222,7 @@ export function whatsappText(
   }
 
   if (audience === "doctor") {
-    L.push(`*Glucose summary — ${name}*`, `${range} (${s.days} days)`, `Target: ${target}`, "");
+    L.push(`*Glucose summary — ${name}*`, `${range} (${span})`, `Target: ${target}`, "");
     if (!s.readingCount) L.push("No readings logged in this period.");
     else {
       L.push(`Readings: ${s.readingCount}`);
@@ -243,7 +252,7 @@ export function whatsappText(
   }
 
   // dietitian
-  L.push(`*Food & glucose summary — ${name}*`, `${range} (${s.days} days)`, "");
+  L.push(`*Food & glucose summary — ${name}*`, `${range} (${span})`, "");
   L.push(`Meals logged: ${s.mealCount}`);
   if (s.mealCount) {
     L.push(`Portions: ${PORTIONS.map((p) => `${p.label.toLowerCase()} ${pct(s.portions[p.id] ?? 0, s.mealCount)}%`).join(" · ")}`);
@@ -270,6 +279,41 @@ export function whatsappText(
   }
   if (s.energyAvg != null) L.push("", `Energy avg: ${s.energyAvg}/5 (${label(ENERGY, Math.round(s.energyAvg))?.toLowerCase()})`);
   L.push("", "_Self-logged via Shuga._");
+  return L.join("\n");
+}
+
+/** End-of-day message for family: everything logged today, in time order. */
+function familyDayText(name: string, s: Summary, data: { readings: GlucoseReading[]; meals: Meal[]; checkIns?: CheckIn[] }): string {
+  const L: string[] = [`🌿 *${name}'s day*`, `_${fmtDayLong(s.since)}_`, ""];
+  const mark = (v: number) => (v < s.target.lo ? " (low)" : v > s.target.hi ? " (high)" : " ✓");
+
+  if (data.readings.length) {
+    L.push("*Sugar*");
+    for (const r of data.readings) L.push(`${fmtTime(r.takenAt)} · ${fmtMmol(r.value)}${mark(r.value)} — ${contextLabel(r.context).toLowerCase()}`);
+    if (data.readings.length > 1) L.push(`${s.timeInRange}% in range today`);
+    L.push("");
+  } else L.push("No sugar readings today.", "");
+
+  if (data.meals.length) {
+    L.push("*Meals*");
+    for (const m of data.meals) {
+      const tags = m.tags.split(",").filter(Boolean).join(", ").toLowerCase();
+      L.push(`${labelOf(MEAL_KINDS, m.kind)}: ${labelOf(PORTIONS, m.portion).toLowerCase()}${tags ? ` — ${tags}` : ""}`);
+    }
+    L.push("");
+  }
+
+  const last = data.checkIns?.at(-1);
+  if (last) {
+    const bits = [`Feeling ${label(MOODS, last.mood)?.toLowerCase()}`];
+    if (last.energy) bits.push(`energy ${label(ENERGY, last.energy)?.toLowerCase()}`);
+    if (last.medsTaken != null) bits.push(last.medsTaken ? "meds taken" : "meds not yet");
+    if (last.moved) bits.push("went for a walk / moved");
+    L.push(bits.join(" · "), "");
+  }
+
+  const allIn = data.readings.length > 0 && data.readings.every((r) => r.value >= s.target.lo && r.value <= s.target.hi);
+  L.push(allIn ? "A steady day. Thanks for checking in on me 💚" : "One day at a time. Thanks for being in my corner 💚");
   return L.join("\n");
 }
 

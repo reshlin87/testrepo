@@ -22,7 +22,7 @@ export function GlucoseChart({ readings, since, days, lo, hi }: { readings: Gluc
 
   return (
     <>
-      <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Blood sugar readings over the last ${days} days`}>
+      <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={days === 1 ? "Blood sugar readings today" : `Blood sugar readings over the last ${days} days`}>
         <rect className="band" x={L} width={W - L - R} y={y(hi)} height={y(lo) - y(hi)} rx="4" />
         {ticks.map((v) => (
           <g key={v}>
@@ -30,7 +30,10 @@ export function GlucoseChart({ readings, since, days, lo, hi }: { readings: Gluc
             <text className="axis" x={L - 6} y={y(v) + 4} textAnchor="end">{v}</text>
           </g>
         ))}
-        {Array.from({ length: days }, (_, i) => i).filter((i) => (days - 1 - i) % labelEvery === 0).map((i) => {
+        {days === 1 && [6, 12, 18].map((h) => (
+          <text key={h} className="axis" x={x(since.getTime() + h * 3600_000)} y={H - 6} textAnchor="middle">{`${String(h).padStart(2, "0")}:00`}</text>
+        ))}
+        {days > 1 && Array.from({ length: days }, (_, i) => i).filter((i) => (days - 1 - i) % labelEvery === 0).map((i) => {
           const t = since.getTime() + i * DAY_MS + DAY_MS / 2;
           return <text key={i} className="axis" x={x(t)} y={H - 6} textAnchor="middle">{days <= 7 ? new Intl.DateTimeFormat("en-ZA", { weekday: "short", timeZone: "Africa/Johannesburg" }).format(new Date(t)) : fmtDate(new Date(t))}</text>;
         })}

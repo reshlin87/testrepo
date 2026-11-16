@@ -274,3 +274,14 @@ details.more > div { padding-top: 6px; }
   .scale .chip span { font-size: 12.5px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Long-form text (privacy) ----------------------------------------- */
+.prose { line-height: 1.65; }
+.prose h2 { font-size: 24px; margin: 38px 0 0; }
+.prose h3 { font-size: 17px; font-weight: 600; margin: 20px 0 0; }
+.prose p, .prose ul, .prose ol { margin: 10px 0 0; color: var(--ink-2); max-width: 62ch; }
+.prose ul, .prose ol { padding-left: 22px; }
+.prose li + li { margin-top: 6px; }
+.prose b, .prose em { color: var(--ink); }
+.prose a { color: var(--accent); text-underline-offset: 2px; }
+.fine a, .legal-link { color: inherit; text-underline-offset: 2px; }

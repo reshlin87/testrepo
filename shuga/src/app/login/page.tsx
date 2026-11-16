@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, demoLoginEnabled } from "@/auth";
 import { signInWith } from "@/app/actions";
@@ -33,7 +34,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </form>
         )}
       </div>
-      <p className="fine">Shuga helps you keep track. It doesn&rsquo;t replace advice from your doctor, nurse or dietitian. Your entries are private to you.</p>
+      <p className="fine">Shuga helps you keep track. It doesn&rsquo;t replace advice from your doctor, nurse or dietitian. Your entries are private to you. <Link href="/privacy">Privacy</Link></p>
     </main>
   );
 }
