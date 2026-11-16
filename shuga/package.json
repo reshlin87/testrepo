@@ -1,0 +1,32 @@
+{
+  "name": "shuga",
+  "version": "1.0.0",
+  "description": "Shuga — gentle diabetes tracking for South Africans",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && prisma db push --skip-generate && next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "postinstall": "prisma generate"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.3",
+    "@prisma/client": "^6.19.3",
+    "next": "^15.5.29",
+    "next-auth": "^5.0.0-beta.29",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "prisma": "^6.19.3",
+    "typescript": "^5.9.3"
+  },
+  "private": true
+}
